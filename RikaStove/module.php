@@ -33,9 +33,7 @@ class RikaStove extends IPSModule
         // 2. Profil für die Betriebsmodi (Exakt nach deinen Werten: 0, 1, 2)
         if (!IPS_VariableProfileExists('Rika.OperatingMode')) {
             IPS_CreateVariableProfile('Rika.OperatingMode', 1);
-            // Bereich von 0 bis 2 einschränken mit Schrittweite 1
             IPS_SetVariableProfileValues('Rika.OperatingMode', 0, 2, 1);
-            // Die 3 Modi aus den Bildern zuweisen
             IPS_SetVariableProfileAssociation('Rika.OperatingMode', 0, "Manueller Modus", "", -1);
             IPS_SetVariableProfileAssociation('Rika.OperatingMode', 1, "Automatik Modus", "", -1);
             IPS_SetVariableProfileAssociation('Rika.OperatingMode', 2, "Komfort Modus", "", -1);
@@ -81,13 +79,26 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.Signal', "Signal");
         }
 
+        // 8. NEU: Profil für die Fehlercodes (Mapping von IDs auf kurze Wörter)
+        if (!IPS_VariableProfileExists('Rika.Error')) {
+            IPS_CreateVariableProfile('Rika.Error', 1);
+            IPS_SetVariableProfileAssociation('Rika.Error', 0, "OK", "", 0x00FF00); // Grün bei 0
+            IPS_SetVariableProfileAssociation('Rika.Error', 1, "Keine Pellets", "", 0xFF0000); // Rot bei Fehlern
+            IPS_SetVariableProfileAssociation('Rika.Error', 2, "Zündung fehlgeschlagen", "", 0xFF0000);
+            IPS_SetVariableProfileAssociation('Rika.Error', 3, "Brennkammer offen / Tür", "", 0xFF0000);
+            IPS_SetVariableProfileAssociation('Rika.Error', 4, "Sicherheitsschalter", "", 0xFF0000);
+            IPS_SetVariableProfileAssociation('Rika.Error', 5, "Übertemperatur", "", 0xFF0000);
+            IPS_SetVariableProfileAssociation('Rika.Error', 99, "Unbekannter Fehler", "", 0xFF0000);
+            IPS_SetVariableProfileIcon('Rika.Error', "Alert");
+        }
+
         // --- Variablen registrieren ---
 
         // Basiseinstellungen & Temperaturen
         $this->RegisterVariableBoolean('Status', 'Ofen An/Aus', '~Switch');
         $this->EnableAction('Status');
 
-        // Betriebsmodus registrieren und Schalten aktivieren
+        // Betriebsmodus
         $this->RegisterVariableInteger('OperatingMode', 'Betriebsmodus', 'Rika.OperatingMode');
         $this->EnableAction('OperatingMode');
 
@@ -111,8 +122,8 @@ class RikaStove extends IPSModule
         $this->RegisterVariableInteger('ParameterIgnitionCount', 'Anzahl Zündungen', '');
         $this->RegisterVariableInteger('WifiStrength', 'WLAN Signalstärke', 'Rika.Signal');
         
-        // Fehler / Warnungen
-        $this->RegisterVariableInteger('StatusError', 'Fehlercode', '');
+        // Fehler / Warnungen (Hier nutzen wir jetzt das neue Mapping-Profil!)
+        $this->RegisterVariableInteger('StatusError', 'Fehlerzustand', 'Rika.Error');
         $this->RegisterVariableInteger('StatusWarning', 'Warnungscode', '');
 
         // Software-Versionen

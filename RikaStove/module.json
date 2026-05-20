@@ -1,0 +1,13 @@
+{
+  "id": "{F1E2D3C4-B5A6-4987-8A9B-C0D1E2F3A4B5}",
+  "name": "RikaStove",
+  "type": 3,
+  "vendor": "Rika",
+  "aliases": [
+    "RikaStove"
+  ],
+  "parentRequirements": [],
+  "childRequirements": [],
+  "implemented": [],
+  "prefix": "RIKA"
+}

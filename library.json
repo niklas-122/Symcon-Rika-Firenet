@@ -1,5 +1,5 @@
 {
-    "id": "{bc4f1e3c-83b2-4d2a-a567-91f6cf40428d}",
+    "id": "{A3B4567C-1234-4ABC-8901-DEF123456789}",
     "title": "Rika Firenet Integration",
     "version": "1.0",
     "build": 0,
@@ -11,7 +11,7 @@
     },
     "modules": [
         {
-            "id": "{72fa231a-da23-412e-9988-11a28cb7362a}",
+            "id": "{F6E5D4C3-B2A1-48A7-0C9B-6C5B4A3F2E1D}",
             "name": "RikaStove",
             "type": 3,
             "vendor": "Rika",

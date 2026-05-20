@@ -1,25 +1,27 @@
 <?php
 
-class RikaStove extends IPSModule {
-
+class RikaStove extends IPSModule
+{
     private $baseUrl = "https://www.rika-firenet.com";
 
-    public function Create() {
+    public function Create()
+    {
         parent::Create();
 
-        $this->RegisterPropertyString("Email", "");
-        $this->RegisterPropertyString("Password", "");
-        $this->RegisterPropertyString("StoveID", "");
-        $this->RegisterPropertyInteger("Interval", 300); 
+        $this->RegisterPropertyString('Email', '');
+        $this->RegisterPropertyString('Password', '');
+        $this->RegisterPropertyString('StoveID', '');
+        $this->RegisterPropertyInteger('Interval', 300);
 
-        $this->RegisterTimer("UpdateTimer", 0, 'RIKA_UpdateStatus($_IPS[\'TARGET\']);');
+        $this->RegisterTimer('UpdateData', 0, 'RIKA_UpdateStatus($_IPS[\'TARGET\']);');
     }
 
-    public function ApplyChanges() {
+    public function ApplyChanges()
+    {
         parent::ApplyChanges();
 
         if (!IPS_VariableProfileExists('Rika.Status')) {
-            IPS_CreateVariableProfile('Rika.Status', 1); 
+            IPS_CreateVariableProfile('Rika.Status', 1);
             IPS_SetVariableProfileAssociation('Rika.Status', 1, "Aus / Standby", "", -1);
             IPS_SetVariableProfileAssociation('Rika.Status', 2, "Zündphase", "", -1);
             IPS_SetVariableProfileAssociation('Rika.Status', 3, "Heizbetrieb", "", -1);
@@ -27,27 +29,28 @@ class RikaStove extends IPSModule {
             IPS_SetVariableProfileAssociation('Rika.Status', 5, "Ausbrand", "", -1);
         }
 
-        $this->RegisterVariableBoolean("Status", "Ofen An/Aus", "~Switch");
-        $this->EnableAction("Status"); 
+        $this->RegisterVariableBoolean('Status', 'Ofen An/Aus', '~Switch');
+        $this->EnableAction('Status');
 
-        $this->RegisterVariableFloat("RoomTemperature", "Raumtemperatur", "~Temperature");
-        $this->RegisterVariableFloat("FlameTemperature", "Flammentemperatur", "~Temperature");
+        $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
+        $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
         
-        $this->RegisterVariableFloat("TargetTemperature", "Soll-Temperatur", "~TemperatureRoomSet");
-        $this->EnableAction("TargetTemperature"); 
+        $this->RegisterVariableFloat('TargetTemperature', 'Soll-Temperatur', '~TemperatureRoomSet');
+        $this->EnableAction('TargetTemperature');
 
-        $this->RegisterVariableInteger("StoveState", "Ofen Zustand", "Rika.Status");
+        $this->RegisterVariableInteger('StoveState', 'Ofen Zustand', 'Rika.Status');
 
-        $interval = $this->ReadPropertyInteger("Interval");
-        $this->SetTimerInterval("UpdateTimer", $interval * 1000);
+        // Timer direkt hier anhand des konfigurierten Intervalls setzen
+        $this->SetTimerInterval('UpdateData', $this->ReadPropertyInteger('Interval') * 1000);
     }
 
-    public function RequestAction($Ident, $Value) {
+    public function RequestAction($Ident, $Value)
+    {
         switch ($Ident) {
-            case "Status":
+            case 'Status':
                 $this->SetStoveControl(['onOff' => (bool)$Value]);
                 break;
-            case "TargetTemperature":
+            case 'TargetTemperature':
                 $this->SetStoveControl(['targetTemperature' => (string)$Value]);
                 break;
             default:
@@ -55,8 +58,9 @@ class RikaStove extends IPSModule {
         }
     }
 
-    public function UpdateStatus() {
-        $stoveId = $this->ReadPropertyString("StoveID");
+    public function UpdateStatus()
+    {
+        $stoveId = $this->ReadPropertyString('StoveID');
         if (empty($stoveId)) return;
 
         $statusUrl = $this->baseUrl . "/api/client/" . $stoveId . "/status";
@@ -66,34 +70,33 @@ class RikaStove extends IPSModule {
             if ($this->firenetLogin()) {
                 $request = $this->firenetRequest($statusUrl);
             } else {
-                $this->SetStatus(201); 
+                $this->SetStatus(201);
                 return;
             }
         }
 
         if ($request['code'] == 200) {
             $data = json_decode($request['body'], true);
-            $this->SetStatus(102); 
+            $this->SetStatus(102);
 
             if (isset($data['sensors'])) {
-                $this->SetValue("RoomTemperature", floatval($data['sensors']['inputRoomTemperature']));
-                $this->SetValue("FlameTemperature", floatval($data['sensors']['inputFlameTemperature']));
-                
-                $mainState = $data['sensors']['statusMainState']; 
-                $this->SetValue("StoveState", intval($mainState));
+                $this->SetValue('RoomTemperature', floatval($data['sensors']['inputRoomTemperature']));
+                $this->SetValue('FlameTemperature', floatval($data['sensors']['inputFlameTemperature']));
+                $this->SetValue('StoveState', intval($data['sensors']['statusMainState']));
             }
 
             if (isset($data['controls'])) {
-                $this->SetValue("Status", (bool)$data['controls']['onOff']);
-                $this->SetValue("TargetTemperature", floatval($data['controls']['targetTemperature']));
+                $this->SetValue('Status', (bool)$data['controls']['onOff']);
+                $this->SetValue('TargetTemperature', floatval($data['controls']['targetTemperature']));
             }
         } else {
-            $this->SetStatus(202); 
+            $this->SetStatus(202);
         }
     }
 
-    private function SetStoveControl($newData) {
-        $stoveId = $this->ReadPropertyString("StoveID");
+    private function SetStoveControl($newData)
+    {
+        $stoveId = $this->ReadPropertyString('StoveID');
         $statusUrl = $this->baseUrl . "/api/client/" . $stoveId . "/status";
         
         $request = $this->firenetRequest($statusUrl);
@@ -115,7 +118,8 @@ class RikaStove extends IPSModule {
         }
     }
 
-    private function firenetRequest($url, $postFields = null) {
+    private function firenetRequest($url, $postFields = null)
+    {
         $cookieFile = sys_get_temp_dir() . '/rika_cookie_' . $this->InstanceID . '.txt';
         
         $ch = curl_init();
@@ -123,7 +127,7 @@ class RikaStove extends IPSModule {
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
         curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)');
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
         curl_setopt($ch, CURLOPT_AUTOREFERER, true);
@@ -132,10 +136,10 @@ class RikaStove extends IPSModule {
             curl_setopt($ch, CURLOPT_POST, true);
             if (is_array($postFields)) {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/x-www-form-urlencoded']);
             } else {
                 curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
-                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, ['Content-Type: application/json']);
             }
         }
 
@@ -146,7 +150,8 @@ class RikaStove extends IPSModule {
         return ['code' => $httpCode, 'body' => $response];
     }
 
-    private function firenetLogin() {
+    private function firenetLogin()
+    {
         $loginPageUrl = $this->baseUrl . "/web/login";
         
         $initialRequest = $this->firenetRequest($loginPageUrl);
@@ -159,8 +164,8 @@ class RikaStove extends IPSModule {
         }
 
         $payload = [
-            'email'    => $this->ReadPropertyString("Email"),
-            'password' => $this->ReadPropertyString("Password")
+            'email'    => $this->ReadPropertyString('Email'),
+            'password' => $this->ReadPropertyString('Password')
         ];
 
         $result = $this->firenetRequest($postUrl, $payload);

@@ -39,7 +39,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.TargetTemp', "Temperature");
         }
 
-        // 3. Profil für Gebläsestufen (Integer, 0-4 oder Stufen nach Rika-Vorgabe)
+        // 3. Profil für Gebläsestufen (Integer, 0-5)
         if (!IPS_VariableProfileExists('Rika.FanLevel')) {
             IPS_CreateVariableProfile('Rika.FanLevel', 1);
             IPS_SetVariableProfileValues('Rika.FanLevel', 0, 5, 1);
@@ -54,7 +54,15 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.Hours', "Clock");
         }
 
-        // 5. Profil für WLAN Signalstärke (Integer / dBm)
+        // 5. Profil für Pelletsverbrauch (Float / Kilogramm)
+        if (!IPS_VariableProfileExists('Rika.Kg')) {
+            IPS_CreateVariableProfile('Rika.Kg', 2);
+            IPS_SetVariableProfileDigits('Rika.Kg', 1);
+            IPS_SetVariableProfileText('Rika.Kg', "", " kg");
+            IPS_SetVariableProfileIcon('Rika.Kg', "Box");
+        }
+
+        // 6. Profil für WLAN Signalstärke (Integer / dBm)
         if (!IPS_VariableProfileExists('Rika.Signal')) {
             IPS_CreateVariableProfile('Rika.Signal', 1);
             IPS_SetVariableProfileText('Rika.Signal', "", " dBm");
@@ -75,15 +83,15 @@ class RikaStove extends IPSModule
 
         $this->RegisterVariableInteger('StoveState', 'Ofen Zustand', 'Rika.Status');
 
-        // MultiAir Gebläse (Sowohl lesbar als auch steuerbar!)
+        // MultiAir Gebläse
         $this->RegisterVariableInteger('ConvectionFan1Level', 'MultiAir 1 Stufe', 'Rika.FanLevel');
         $this->EnableAction('ConvectionFan1Level');
         $this->RegisterVariableInteger('ConvectionFan2Level', 'MultiAir 2 Stufe', 'Rika.FanLevel');
         $this->EnableAction('ConvectionFan2Level');
 
-        // Diagnosedaten & Zähler
+        // Diagnosedaten & Zähler (Hier ist jetzt das Kg-Profil hinterlegt)
         $this->RegisterVariableFloat('ParameterRuntimePellets', 'Laufzeit Pellets', 'Rika.Hours');
-        $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch Index', '');
+        $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch', 'Rika.Kg');
         $this->RegisterVariableInteger('ParameterIgnitionCount', 'Anzahl Zündungen', '');
         $this->RegisterVariableInteger('WifiStrength', 'WLAN Signalstärke', 'Rika.Signal');
         
@@ -140,7 +148,7 @@ class RikaStove extends IPSModule
             $data = json_decode($request['body'], true);
             $this->SetStatus(102);
 
-            // 1. Daten aus dem 'controls' Array (Soll-Werte / Stati)
+            // 1. Daten aus dem 'controls' Array
             if (isset($data['controls'])) {
                 $this->SetValue('Status', (bool)$data['controls']['onOff']);
                 $this->SetValue('TargetTemperature', floatval($data['controls']['targetTemperature']));
@@ -148,7 +156,7 @@ class RikaStove extends IPSModule
                 $this->SetValue('ConvectionFan2Level', intval($data['controls']['convectionFan2Level']));
             }
 
-            // 2. Daten aus dem 'sensors' Array (Ist-Werte / Zähler)
+            // 2. Daten aus dem 'sensors' Array
             if (isset($data['sensors'])) {
                 $this->SetValue('RoomTemperature', floatval($data['sensors']['inputRoomTemperature']));
                 $this->SetValue('FlameTemperature', floatval($data['sensors']['inputFlameTemperature']));
@@ -158,7 +166,6 @@ class RikaStove extends IPSModule
                 $this->SetValue('StatusWarning', intval($data['sensors']['statusWarning']));
                 $this->SetValue('WifiStrength', intval($data['sensors']['statusWifiStrength']));
 
-                // Parameter & Zähler exakt nach Ofen-Rohdaten mappen
                 if (isset($data['sensors']['parameterRuntimePellets'])) {
                     $this->SetValue('ParameterRuntimePellets', floatval($data['sensors']['parameterRuntimePellets']));
                 }

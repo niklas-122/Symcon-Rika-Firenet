@@ -13,6 +13,7 @@ class RikaStove extends IPSModule
         $this->RegisterPropertyString('StoveID', '');
         $this->RegisterPropertyInteger('Interval', 300);
 
+        // Timer wieder exakt auf 'UpdateData' registriert
         $this->RegisterTimer('UpdateData', 0, 'RIKA_UpdateStatus($_IPS[\'TARGET\']);');
     }
 
@@ -24,7 +25,7 @@ class RikaStove extends IPSModule
         // VARIABLENPROFILE ERSTELLEN
         // ----------------------------------------------------
 
-        // Ofen-Betriebszustand (Ist-Zustand vom Ofen)
+        // Ofen-Betriebszustand
         if (!IPS_VariableProfileExists('Rika.Status')) {
             IPS_CreateVariableProfile('Rika.Status', 1);
             IPS_SetVariableProfileAssociation('Rika.Status', 1, "Aus / Standby", "", -1);
@@ -34,7 +35,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileAssociation('Rika.Status', 5, "Ausbrand", "", -1);
         }
 
-        // Betriebsmodus (Gewünschtes Programm zum Umschalten)
+        // Betriebsmodus (0, 1, 2)
         if (!IPS_VariableProfileExists('Rika.OperatingMode')) {
             IPS_CreateVariableProfile('Rika.OperatingMode', 1);
             IPS_SetVariableProfileValues('Rika.OperatingMode', 0, 2, 1);
@@ -44,7 +45,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.OperatingMode', "Gear");
         }
 
-        // Soll-Temperatur (14-28°C)
+        // Soll-Temperatur
         if (!IPS_VariableProfileExists('Rika.TargetTemp')) {
             IPS_CreateVariableProfile('Rika.TargetTemp', 2); 
             IPS_SetVariableProfileValues('Rika.TargetTemp', 14.0, 28.0, 1.0);
@@ -53,7 +54,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.TargetTemp', "Temperature");
         }
 
-        // MultiAir Gebläsestufen (0-5)
+        // MultiAir Gebläsestufen
         if (!IPS_VariableProfileExists('Rika.FanLevel')) {
             IPS_CreateVariableProfile('Rika.FanLevel', 1);
             IPS_SetVariableProfileValues('Rika.FanLevel', 0, 5, 1);
@@ -83,7 +84,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.Signal', "Signal");
         }
 
-        // Fehlercodes
+        // Fehlercodes (Mapping auf kurze Wörter)
         if (!IPS_VariableProfileExists('Rika.Error')) {
             IPS_CreateVariableProfile('Rika.Error', 1);
             IPS_SetVariableProfileAssociation('Rika.Error', 0, "OK", "", 0x00FF00);
@@ -111,92 +112,4 @@ class RikaStove extends IPSModule
         $this->EnableAction('TargetTemperature');
 
 
-        // BLOCK 2: Ist-Werte & Temperaturen
-        $this->RegisterVariableInteger('StoveState', 'Ofen Zustand', 'Rika.Status');
-        $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
-        $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
-
-
-        // BLOCK 3: MultiAir Gebläse
-        $this->RegisterVariableInteger('ConvectionFan1Level', 'MultiAir 1 Stufe', 'Rika.FanLevel');
-        $this->EnableAction('ConvectionFan1Level');
-
-        $this->RegisterVariableInteger('ConvectionFan2Level', 'MultiAir 2 Stufe', 'Rika.FanLevel');
-        $this->EnableAction('ConvectionFan2Level');
-
-
-        // BLOCK 4: Verbrauch & Zähler
-        $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch', 'Rika.Kg');
-        $this->RegisterVariableFloat('ParameterRuntimePellets', 'Laufzeit Pellets', 'Rika.Hours');
-        $this->RegisterVariableInteger('ParameterIgnitionCount', 'Anzahl Zündungen', '');
-
-
-        // BLOCK 5: System & Diagnose
-        $this->RegisterVariableInteger('StatusError', 'Fehlerzustand', 'Rika.Error');
-        $this->RegisterVariableInteger('StatusWarning', 'Warnungscode', '');
-        $this->RegisterVariableInteger('WifiStrength', 'WLAN Signalstärke', 'Rika.Signal');
-        $this->RegisterVariableString('SoftwareMain', 'Software Hauptplatine', '');
-        $this->RegisterVariableString('SoftwareDisplay', 'Software Display', '');
-
-
-        // Timer setzen
-        $this->SetTimerInterval('UpdateData', $this->ReadPropertyInteger('Interval') * 1000);
-    }
-
-    public function RequestAction($Ident, $Value)
-    {
-        switch ($Ident) {
-            case 'Status':
-                $this->SetStoveControl(['onOff' => (bool)$Value]);
-                break;
-            case 'OperatingMode':
-                $this->SetStoveControl(['operatingMode' => (int)$Value]);
-                break;
-            case 'TargetTemperature':
-                $this->SetStoveControl(['targetTemperature' => (string)$Value]);
-                break;
-            case 'ConvectionFan1Level':
-                $this->SetStoveControl(['convectionFan1Level' => (int)$Value]);
-                break;
-            case 'ConvectionFan2Level':
-                $this->SetStoveControl(['convectionFan2Level' => (int)$Value]);
-                break;
-            default:
-                throw new Exception("Invalid Ident");
-        }
-    }
-
-    public function UpdateStatus()
-    {
-        $stoveId = $this->ReadPropertyString('StoveID');
-        if (empty($stoveId)) return;
-
-        $statusUrl = $this->baseUrl . "/api/client/" . $stoveId . "/status";
-        $request = $this->firenetRequest($statusUrl);
-
-        if ($request['code'] == 401 || strpos($request['body'], 'login') !== false || empty($request['body'])) {
-            if ($this->firenetLogin()) {
-                $request = $this->firenetRequest($statusUrl);
-            } else {
-                $this->SetStatus(201);
-                return;
-            }
-        }
-
-        if ($request['code'] == 200) {
-            $data = json_decode($request['body'], true);
-            $this->SetStatus(102);
-
-            // 1. Mapping: Controls (Soll-Werte / Modi)
-            if (isset($data['controls'])) {
-                $this->SetValue('Status', (bool)$data['controls']['onOff']);
-                $this->SetValue('OperatingMode', intval($data['controls']['operatingMode']));
-                $this->SetValue('TargetTemperature', floatval($data['controls']['targetTemperature']));
-                $this->SetValue('ConvectionFan1Level', intval($data['controls']['convectionFan1Level']));
-                $this->SetValue('ConvectionFan2Level', intval($data['controls']['convectionFan2Level']));
-            }
-
-            // 2. Mapping: Sensors (Ist-Werte / Diagnose)
-            if (isset($data['sensors'])) {
-                $this->SetValue('RoomTemperature', floatval($data['sensors']['inputRoomTemperature']));
-                $this
+        // BLOCK 2: Ist-Werte &

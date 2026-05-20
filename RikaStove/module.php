@@ -35,8 +35,8 @@ class RikaStove extends IPSModule
         $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
         $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
         
-        $this->RegisterVariableFloat('TargetTemperature', 'Soll-Temperatur', '~TemperatureRoomSet');
-        $this->EnableAction('TargetTemperature');
+        $this->RegisterVariableFloat('TargetTemperature', 'Soll-Temperatur', '~Temperature');
+        $this->EnableAction('TargetTemperature');        
 
         $this->RegisterVariableInteger('StoveState', 'Ofen Zustand', 'Rika.Status');
 

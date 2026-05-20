@@ -9,11 +9,9 @@ class RikaStove extends IPSModule {
 
         $this->RegisterPropertyString("Email", "");
         $this->RegisterPropertyString("Password", "");
-        $this->ReadPropertyString("StoveID", ""); // Registriert die Eigenschaft
         $this->RegisterPropertyString("StoveID", "");
         $this->RegisterPropertyInteger("Interval", 300); 
 
-        // WICHTIG: Nutzt jetzt das in der library.json definierte Präfix RIKA
         $this->RegisterTimer("UpdateTimer", 0, 'RIKA_UpdateStatus($_IPS[\'TARGET\']);');
     }
 
@@ -35,7 +33,7 @@ class RikaStove extends IPSModule {
         $this->RegisterVariableFloat("RoomTemperature", "Raumtemperatur", "~Temperature");
         $this->RegisterVariableFloat("FlameTemperature", "Flammentemperatur", "~Temperature");
         
-        $this->RegisterVariableFloat("TargetTemperature", "Soll-Temperatur", "~TemperatureRoom");
+        $this->RegisterVariableFloat("TargetTemperature", "Soll-Temperatur", "~TemperatureRoomSet");
         $this->EnableAction("TargetTemperature"); 
 
         $this->RegisterVariableInteger("StoveState", "Ofen Zustand", "Rika.Status");
@@ -118,7 +116,6 @@ class RikaStove extends IPSModule {
     }
 
     private function firenetRequest($url, $postFields = null) {
-        // Safe-Location für Linux-Rechte
         $cookieFile = sys_get_temp_dir() . '/rika_cookie_' . $this->InstanceID . '.txt';
         
         $ch = curl_init();
@@ -167,7 +164,6 @@ class RikaStove extends IPSModule {
         ];
 
         $result = $this->firenetRequest($postUrl, $payload);
-        
         return (strpos($result['body'], 'logout') !== false || strpos($result['body'], '/web/logout') !== false);
     }
 }

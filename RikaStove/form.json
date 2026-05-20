@@ -1,11 +1,13 @@
 {
-    "elements": [
-        { "type": "ValidationTextBox", "name": "Email", "caption": "E-Mail Adresse" },
-        { "type": "ValidationTextBox", "name": "Password", "caption": "Passwort", "password": true },
-        { "type": "ValidationTextBox", "name": "StoveID", "caption": "Ofen ID (aus der Firenet-URL)" },
-        { "type": "NumberSpinner", "name": "Interval", "caption": "Abfrage-Intervall (Sekunden)", "minimum": 60 }
-    ],
-    "actions": [
-        { "type": "Button", "label": "Jetzt aktualisieren", "onClick": "RIKA_UpdateStatus($id);" }
-    ]
+  "elements": [
+    { "type": "Label", "label": "___ [ Rika Firenet Login ] ________________________________________________" },
+    { "name": "Email", "type": "ValidationTextBox", "caption": "E-Mail Adresse" },
+    { "name": "Password", "type": "PasswordTextBox", "caption": "Passwort" },
+    { "name": "StoveID", "type": "ValidationTextBox", "caption": "Ofen ID (Stove ID)" },
+    { "type": "Label", "label": "___ [ Module Settings ] ________________________________________________" },
+    { "type": "NumberSpinner", "name": "Interval", "caption": "Abfrage-Intervall (Sekunden)", "minimum": 60 }
+  ],
+  "actions": [
+    { "type": "Button", "label": "Jetzt aktualisieren", "onClick": "RIKA_UpdateStatus($id);" }
+  ]
 }

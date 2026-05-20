@@ -16,10 +16,11 @@ class RikaStove extends IPSModule
         $this->RegisterTimer('UpdateData', 0, 'RIKA_UpdateStatus($_IPS[\'TARGET\']);');
     }
 
-    public function ApplyChanges()
+public function ApplyChanges()
     {
         parent::ApplyChanges();
 
+        // 1. Profil für den Ofen-Zustand (Integer)
         if (!IPS_VariableProfileExists('Rika.Status')) {
             IPS_CreateVariableProfile('Rika.Status', 1);
             IPS_SetVariableProfileAssociation('Rika.Status', 1, "Aus / Standby", "", -1);
@@ -29,18 +30,33 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileAssociation('Rika.Status', 5, "Ausbrand", "", -1);
         }
 
+        // 2. NEU: Eigenes Profil für die Soll-Temperatur (Float)
+        if (!IPS_VariableProfileExists('Rika.TargetTemp')) {
+            // Profiltyp 2 ist Float (wichtig für die Temperatur-Variable)
+            IPS_CreateVariableProfile('Rika.TargetTemp', 2); 
+            // Wertebereich: Min 14.0, Max 28.0, Schrittweite 1.0
+            IPS_SetVariableProfileValues('Rika.TargetTemp', 14.0, 28.0, 1.0);
+            // 1 Nachkommastelle anzeigen und " °C" als Suffix anhängen
+            IPS_SetVariableProfileDigits('Rika.TargetTemp', 1);
+            IPS_SetVariableProfileText('Rika.TargetTemp', "", " °C");
+            // Ein passendes Icon (Thermometer) zuweisen
+            IPS_SetVariableProfileIcon('Rika.TargetTemp', "Temperature");
+        }
+
+        // 3. Variablen registrieren
         $this->RegisterVariableBoolean('Status', 'Ofen An/Aus', '~Switch');
         $this->EnableAction('Status');
 
         $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
         $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
         
-        $this->RegisterVariableFloat('TargetTemperature', 'Soll-Temperatur', '~Temperature');
-        $this->EnableAction('TargetTemperature');        
+        // HIER DIE ÄNDERUNG: Wir nutzen jetzt unser neues Profil 'Rika.TargetTemp'
+        $this->RegisterVariableFloat('TargetTemperature', 'Soll-Temperatur', 'Rika.TargetTemp');
+        $this->EnableAction('TargetTemperature');
 
         $this->RegisterVariableInteger('StoveState', 'Ofen Zustand', 'Rika.Status');
 
-        // Timer direkt hier anhand des konfigurierten Intervalls setzen
+        // Timer setzen
         $this->SetTimerInterval('UpdateData', $this->ReadPropertyInteger('Interval') * 1000);
     }
 

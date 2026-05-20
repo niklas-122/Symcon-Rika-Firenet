@@ -20,7 +20,7 @@ class RikaStove extends IPSModule
     {
         parent::ApplyChanges();
 
-        // 1. Profil für den Ofen-Zustand (Integer)
+        // 1. Profil für den Ofen-Zustand (Integer - Nur Lesen)
         if (!IPS_VariableProfileExists('Rika.Status')) {
             IPS_CreateVariableProfile('Rika.Status', 1);
             IPS_SetVariableProfileAssociation('Rika.Status', 1, "Aus / Standby", "", -1);
@@ -30,7 +30,19 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileAssociation('Rika.Status', 5, "Ausbrand", "", -1);
         }
 
-        // 2. Profil für die Soll-Temperatur (Float, 14-28°C, Schrittweite 1)
+        // 2. Profil für die Betriebsmodi (Exakt nach deinen Werten: 0, 1, 2)
+        if (!IPS_VariableProfileExists('Rika.OperatingMode')) {
+            IPS_CreateVariableProfile('Rika.OperatingMode', 1);
+            // Bereich von 0 bis 2 einschränken mit Schrittweite 1
+            IPS_SetVariableProfileValues('Rika.OperatingMode', 0, 2, 1);
+            // Die 3 Modi aus den Bildern zuweisen
+            IPS_SetVariableProfileAssociation('Rika.OperatingMode', 0, "Manueller Modus", "", -1);
+            IPS_SetVariableProfileAssociation('Rika.OperatingMode', 1, "Automatik Modus", "", -1);
+            IPS_SetVariableProfileAssociation('Rika.OperatingMode', 2, "Komfort Modus", "", -1);
+            IPS_SetVariableProfileIcon('Rika.OperatingMode', "Gear");
+        }
+
+        // 3. Profil für die Soll-Temperatur (Float, 14-28°C, Schrittweite 1)
         if (!IPS_VariableProfileExists('Rika.TargetTemp')) {
             IPS_CreateVariableProfile('Rika.TargetTemp', 2); 
             IPS_SetVariableProfileValues('Rika.TargetTemp', 14.0, 28.0, 1.0);
@@ -39,14 +51,14 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.TargetTemp', "Temperature");
         }
 
-        // 3. Profil für Gebläsestufen (Integer, 0-5)
+        // 4. Profil für Gebläsestufen (Integer, 0-5)
         if (!IPS_VariableProfileExists('Rika.FanLevel')) {
             IPS_CreateVariableProfile('Rika.FanLevel', 1);
             IPS_SetVariableProfileValues('Rika.FanLevel', 0, 5, 1);
             IPS_SetVariableProfileIcon('Rika.FanLevel', "Ventilator");
         }
 
-        // 4. Profil für Laufzeiten (Float / Stunden)
+        // 5. Profil für Laufzeiten (Float / Stunden)
         if (!IPS_VariableProfileExists('Rika.Hours')) {
             IPS_CreateVariableProfile('Rika.Hours', 2);
             IPS_SetVariableProfileDigits('Rika.Hours', 1);
@@ -54,7 +66,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.Hours', "Clock");
         }
 
-        // 5. Profil für Pelletsverbrauch (Float / Kilogramm)
+        // 6. Profil für Pelletsverbrauch (Float / Kilogramm)
         if (!IPS_VariableProfileExists('Rika.Kg')) {
             IPS_CreateVariableProfile('Rika.Kg', 2);
             IPS_SetVariableProfileDigits('Rika.Kg', 1);
@@ -62,7 +74,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.Kg', "Box");
         }
 
-        // 6. Profil für WLAN Signalstärke (Integer / dBm)
+        // 7. Profil für WLAN Signalstärke (Integer / dBm)
         if (!IPS_VariableProfileExists('Rika.Signal')) {
             IPS_CreateVariableProfile('Rika.Signal', 1);
             IPS_SetVariableProfileText('Rika.Signal', "", " dBm");
@@ -74,6 +86,10 @@ class RikaStove extends IPSModule
         // Basiseinstellungen & Temperaturen
         $this->RegisterVariableBoolean('Status', 'Ofen An/Aus', '~Switch');
         $this->EnableAction('Status');
+
+        // Betriebsmodus registrieren und Schalten aktivieren
+        $this->RegisterVariableInteger('OperatingMode', 'Betriebsmodus', 'Rika.OperatingMode');
+        $this->EnableAction('OperatingMode');
 
         $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
         $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
@@ -89,7 +105,7 @@ class RikaStove extends IPSModule
         $this->RegisterVariableInteger('ConvectionFan2Level', 'MultiAir 2 Stufe', 'Rika.FanLevel');
         $this->EnableAction('ConvectionFan2Level');
 
-        // Diagnosedaten & Zähler (Hier ist jetzt das Kg-Profil hinterlegt)
+        // Diagnosedaten & Zähler
         $this->RegisterVariableFloat('ParameterRuntimePellets', 'Laufzeit Pellets', 'Rika.Hours');
         $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch', 'Rika.Kg');
         $this->RegisterVariableInteger('ParameterIgnitionCount', 'Anzahl Zündungen', '');
@@ -112,6 +128,9 @@ class RikaStove extends IPSModule
         switch ($Ident) {
             case 'Status':
                 $this->SetStoveControl(['onOff' => (bool)$Value]);
+                break;
+            case 'OperatingMode':
+                $this->SetStoveControl(['operatingMode' => (int)$Value]);
                 break;
             case 'TargetTemperature':
                 $this->SetStoveControl(['targetTemperature' => (string)$Value]);
@@ -151,6 +170,7 @@ class RikaStove extends IPSModule
             // 1. Daten aus dem 'controls' Array
             if (isset($data['controls'])) {
                 $this->SetValue('Status', (bool)$data['controls']['onOff']);
+                $this->SetValue('OperatingMode', intval($data['controls']['operatingMode']));
                 $this->SetValue('TargetTemperature', floatval($data['controls']['targetTemperature']));
                 $this->SetValue('ConvectionFan1Level', intval($data['controls']['convectionFan1Level']));
                 $this->SetValue('ConvectionFan2Level', intval($data['controls']['convectionFan2Level']));

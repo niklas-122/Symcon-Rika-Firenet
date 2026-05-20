@@ -16,7 +16,7 @@ class RikaStove extends IPSModule
         $this->RegisterTimer('UpdateData', 0, 'RIKA_UpdateStatus($_IPS[\'TARGET\']);');
     }
 
-public function ApplyChanges()
+    public function ApplyChanges()
     {
         parent::ApplyChanges();
 
@@ -30,31 +30,70 @@ public function ApplyChanges()
             IPS_SetVariableProfileAssociation('Rika.Status', 5, "Ausbrand", "", -1);
         }
 
-        // 2. NEU: Eigenes Profil für die Soll-Temperatur (Float)
+        // 2. Profil für die Soll-Temperatur (Float, 14-28°C, Schrittweite 1)
         if (!IPS_VariableProfileExists('Rika.TargetTemp')) {
-            // Profiltyp 2 ist Float (wichtig für die Temperatur-Variable)
             IPS_CreateVariableProfile('Rika.TargetTemp', 2); 
-            // Wertebereich: Min 14.0, Max 28.0, Schrittweite 1.0
             IPS_SetVariableProfileValues('Rika.TargetTemp', 14.0, 28.0, 1.0);
-            // 1 Nachkommastelle anzeigen und " °C" als Suffix anhängen
             IPS_SetVariableProfileDigits('Rika.TargetTemp', 1);
             IPS_SetVariableProfileText('Rika.TargetTemp', "", " °C");
-            // Ein passendes Icon (Thermometer) zuweisen
             IPS_SetVariableProfileIcon('Rika.TargetTemp', "Temperature");
         }
 
-        // 3. Variablen registrieren
+        // 3. Profil für Gebläsestufen (Integer, 0-4 oder Stufen nach Rika-Vorgabe)
+        if (!IPS_VariableProfileExists('Rika.FanLevel')) {
+            IPS_CreateVariableProfile('Rika.FanLevel', 1);
+            IPS_SetVariableProfileValues('Rika.FanLevel', 0, 5, 1);
+            IPS_SetVariableProfileIcon('Rika.FanLevel', "Ventilator");
+        }
+
+        // 4. Profil für Laufzeiten (Float / Stunden)
+        if (!IPS_VariableProfileExists('Rika.Hours')) {
+            IPS_CreateVariableProfile('Rika.Hours', 2);
+            IPS_SetVariableProfileDigits('Rika.Hours', 1);
+            IPS_SetVariableProfileText('Rika.Hours', "", " h");
+            IPS_SetVariableProfileIcon('Rika.Hours', "Clock");
+        }
+
+        // 5. Profil für WLAN Signalstärke (Integer / dBm)
+        if (!IPS_VariableProfileExists('Rika.Signal')) {
+            IPS_CreateVariableProfile('Rika.Signal', 1);
+            IPS_SetVariableProfileText('Rika.Signal', "", " dBm");
+            IPS_SetVariableProfileIcon('Rika.Signal', "Signal");
+        }
+
+        // --- Variablen registrieren ---
+
+        // Basiseinstellungen & Temperaturen
         $this->RegisterVariableBoolean('Status', 'Ofen An/Aus', '~Switch');
         $this->EnableAction('Status');
 
         $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
         $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
         
-        // HIER DIE ÄNDERUNG: Wir nutzen jetzt unser neues Profil 'Rika.TargetTemp'
         $this->RegisterVariableFloat('TargetTemperature', 'Soll-Temperatur', 'Rika.TargetTemp');
         $this->EnableAction('TargetTemperature');
 
         $this->RegisterVariableInteger('StoveState', 'Ofen Zustand', 'Rika.Status');
+
+        // MultiAir Gebläse (Sowohl lesbar als auch steuerbar!)
+        $this->RegisterVariableInteger('ConvectionFan1Level', 'MultiAir 1 Stufe', 'Rika.FanLevel');
+        $this->EnableAction('ConvectionFan1Level');
+        $this->RegisterVariableInteger('ConvectionFan2Level', 'MultiAir 2 Stufe', 'Rika.FanLevel');
+        $this->EnableAction('ConvectionFan2Level');
+
+        // Diagnosedaten & Zähler
+        $this->RegisterVariableFloat('ParameterRuntimePellets', 'Laufzeit Pellets', 'Rika.Hours');
+        $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch Index', '');
+        $this->RegisterVariableInteger('ParameterIgnitionCount', 'Anzahl Zündungen', '');
+        $this->RegisterVariableInteger('WifiStrength', 'WLAN Signalstärke', 'Rika.Signal');
+        
+        // Fehler / Warnungen
+        $this->RegisterVariableInteger('StatusError', 'Fehlercode', '');
+        $this->RegisterVariableInteger('StatusWarning', 'Warnungscode', '');
+
+        // Software-Versionen
+        $this->RegisterVariableString('SoftwareMain', 'Software Hauptplatine', '');
+        $this->RegisterVariableString('SoftwareDisplay', 'Software Display', '');
 
         // Timer setzen
         $this->SetTimerInterval('UpdateData', $this->ReadPropertyInteger('Interval') * 1000);
@@ -68,6 +107,12 @@ public function ApplyChanges()
                 break;
             case 'TargetTemperature':
                 $this->SetStoveControl(['targetTemperature' => (string)$Value]);
+                break;
+            case 'ConvectionFan1Level':
+                $this->SetStoveControl(['convectionFan1Level' => (int)$Value]);
+                break;
+            case 'ConvectionFan2Level':
+                $this->SetStoveControl(['convectionFan2Level' => (int)$Value]);
                 break;
             default:
                 throw new Exception("Invalid Ident");
@@ -95,15 +140,42 @@ public function ApplyChanges()
             $data = json_decode($request['body'], true);
             $this->SetStatus(102);
 
+            // 1. Daten aus dem 'controls' Array (Soll-Werte / Stati)
+            if (isset($data['controls'])) {
+                $this->SetValue('Status', (bool)$data['controls']['onOff']);
+                $this->SetValue('TargetTemperature', floatval($data['controls']['targetTemperature']));
+                $this->SetValue('ConvectionFan1Level', intval($data['controls']['convectionFan1Level']));
+                $this->SetValue('ConvectionFan2Level', intval($data['controls']['convectionFan2Level']));
+            }
+
+            // 2. Daten aus dem 'sensors' Array (Ist-Werte / Zähler)
             if (isset($data['sensors'])) {
                 $this->SetValue('RoomTemperature', floatval($data['sensors']['inputRoomTemperature']));
                 $this->SetValue('FlameTemperature', floatval($data['sensors']['inputFlameTemperature']));
                 $this->SetValue('StoveState', intval($data['sensors']['statusMainState']));
-            }
+                
+                $this->SetValue('StatusError', intval($data['sensors']['statusError']));
+                $this->SetValue('StatusWarning', intval($data['sensors']['statusWarning']));
+                $this->SetValue('WifiStrength', intval($data['sensors']['statusWifiStrength']));
 
-            if (isset($data['controls'])) {
-                $this->SetValue('Status', (bool)$data['controls']['onOff']);
-                $this->SetValue('TargetTemperature', floatval($data['controls']['targetTemperature']));
+                // Parameter & Zähler exakt nach Ofen-Rohdaten mappen
+                if (isset($data['sensors']['parameterRuntimePellets'])) {
+                    $this->SetValue('ParameterRuntimePellets', floatval($data['sensors']['parameterRuntimePellets']));
+                }
+                if (isset($data['sensors']['parameterFeedRateTotal'])) {
+                    $this->SetValue('ParameterFeedRateTotal', floatval($data['sensors']['parameterFeedRateTotal']));
+                }
+                if (isset($data['sensors']['parameterIgnitionCount'])) {
+                    $this->SetValue('ParameterIgnitionCount', intval($data['sensors']['parameterIgnitionCount']));
+                }
+
+                // Software-Versionen
+                if (isset($data['sensors']['parameterVersionMainBoard'])) {
+                    $this->SetValue('SoftwareMain', strval($data['sensors']['parameterVersionMainBoard']));
+                }
+                if (isset($data['sensors']['parameterVersionTFT'])) {
+                    $this->SetValue('SoftwareDisplay', strval($data['sensors']['parameterVersionTFT']));
+                }
             }
         } else {
             $this->SetStatus(202);

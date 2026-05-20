@@ -1,25 +1,12 @@
 {
-    "id": "{A3B4567C-1234-4ABC-8901-DEF123456789}",
-    "title": "Rika Firenet Integration",
-    "version": "1.0",
-    "build": 0,
-    "date": 0,
-    "author": "IP-Symcon User",
-    "url": "",
-    "compatibility": {
-        "version": "6.0"
-    },
-    "modules": [
-        {
-            "id": "{F6E5D4C3-B2A1-48A7-0C9B-6C5B4A3F2E1D}",
-            "name": "RikaStove",
-            "type": 3,
-            "vendor": "Rika",
-            "aliases": [],
-            "parentRequirements": [],
-            "childRequirements": [],
-            "implemented": [],
-            "prefix": "RIKA"
-        }
-    ]
+  "id": "{A1B2C3D4-E5F6-4A5B-8C9D-E0F1A2B3C4D5}",
+  "author": "IP-Symcon User",
+  "name": "Rika Firenet",
+  "url": "https://github.com/niklas-122/Symcon-Rika-Stove",
+  "compatibility": {
+    "version": "6.0"
+  },
+  "version": "1.0",
+  "build": 0,
+  "date": 0
 }

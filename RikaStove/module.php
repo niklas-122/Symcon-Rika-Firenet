@@ -14,7 +14,7 @@ class RikaStove extends IPSModule {
         $this->RegisterPropertyString("StoveID", "");
         $this->RegisterPropertyInteger("Interval", 300); // Standard: 5 Minuten
 
-        // Timer registrieren
+        // Timer registrieren (Ident bleibt exakt wie in deinem Skript)
         $this->RegisterTimer("UpdateTimer", 0, 'Rika_UpdateStatus($_IPS[\'TARGET\']);');
     }
 
@@ -93,7 +93,7 @@ class RikaStove extends IPSModule {
             IPS_SetVariableProfileIcon('Rika.Signal', "Signal");
         }
 
-        // Fehlercodes
+        // Fehlercodes Mapping auf kurze Wörter
         if (!IPS_VariableProfileExists('Rika.Error')) {
             IPS_CreateVariableProfile('Rika.Error', 1);
             IPS_SetVariableProfileAssociation('Rika.Error', 0, "OK", "", 0x00FF00);
@@ -107,69 +107,43 @@ class RikaStove extends IPSModule {
 
 
         // ----------------------------------------------------
-        // VARIABLEN REGISTRIEREN & ERZWUNGENE SORTIERUNG
+        // VARIABLEN REGISTRIEREN (LOGISCH SORTIERT)
         // ----------------------------------------------------
 
-        // BLOCK 1: Aktive Ofensteuerung (Positionen 10-30)
+        // BLOCK 1: Aktive Ofensteuerung (Bedienelemente oben)
         $this->RegisterVariableBoolean("Status", "Ofen An/Aus", "~Switch");
         $this->EnableAction("Status");
-        IPS_SetPosition($this->GetIDForIdent("Status"), 10);
 
         $this->RegisterVariableInteger('OperatingMode', 'Betriebsmodus', 'Rika.OperatingMode');
         $this->EnableAction('OperatingMode');
-        IPS_SetPosition($this->GetIDForIdent("OperatingMode"), 20);
 
         $this->RegisterVariableFloat("TargetTemperature", "Soll-Temperatur", "Rika.TargetTemp");
         $this->EnableAction("TargetTemperature");
-        IPS_SetPosition($this->GetIDForIdent("TargetTemperature"), 30);
 
-        // BLOCK 2: Aktuelle Status- & Temperaturwerte (Positionen 40-60)
+        // BLOCK 2: Aktuelle Status- & Temperaturwerte (Ist-Zustände)
         $this->RegisterVariableInteger("StoveState", "Ofen Zustand", "Rika.Status");
-        IPS_SetPosition($this->GetIDForIdent("StoveState"), 40);
-
         $this->RegisterVariableFloat("RoomTemperature", "Raumtemperatur", "~Temperature");
-        IPS_SetPosition($this->GetIDForIdent("RoomTemperature"), 50);
-
         $this->RegisterVariableFloat("FlameTemperature", "Flammentemperatur", "~Temperature");
-        IPS_SetPosition($this->GetIDForIdent("FlameTemperature"), 60);
 
-        // BLOCK 3: MultiAir Erweiterungen (Positionen 70-80)
+        // BLOCK 3: MultiAir Erweiterungen (Lüfter)
         $this->RegisterVariableInteger('ConvectionFan1Level', 'MultiAir 1 Stufe', 'Rika.FanLevel');
         $this->EnableAction('ConvectionFan1Level');
-        IPS_SetPosition($this->GetIDForIdent("ConvectionFan1Level"), 70);
 
         $this->RegisterVariableInteger('ConvectionFan2Level', 'MultiAir 2 Stufe', 'Rika.FanLevel');
         $this->EnableAction('ConvectionFan2Level');
-        IPS_SetPosition($this->GetIDForIdent("ConvectionFan2Level"), 80);
 
-        // BLOCK 4: Energieverbrauch & Zähler (Positionen 90-120)
+        // BLOCK 4: Energieverbrauch & Zähler (Statistik)
         $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch Gesamt', 'Rika.Kg');
-        IPS_SetPosition($this->GetIDForIdent("ParameterFeedRateTotal"), 90);
-
         $this->RegisterVariableFloat('ParameterRuntimePellets', 'Laufzeit Pellets', 'Rika.Hours');
-        IPS_SetPosition($this->GetIDForIdent("ParameterRuntimePellets"), 100);
-
         $this->RegisterVariableFloat('AverageConsumptionPerHour', 'Verbrauch pro Stunde Ø', 'Rika.KgPerHour');
-        IPS_SetPosition($this->GetIDForIdent("AverageConsumptionPerHour"), 110);
-
         $this->RegisterVariableInteger('ParameterIgnitionCount', 'Anzahl Zündungen', '');
-        IPS_SetPosition($this->GetIDForIdent("ParameterIgnitionCount"), 120);
 
-        // BLOCK 5: Systemdiagnose & Wartung (Positionen 130-170)
+        // BLOCK 5: Systemdiagnose & Wartung (Werte im Hintergrund)
         $this->RegisterVariableInteger('StatusError', 'Fehlerzustand', 'Rika.Error');
-        IPS_SetPosition($this->GetIDForIdent("StatusError"), 130);
-
         $this->RegisterVariableInteger('StatusWarning', 'Warnungscode', '');
-        IPS_SetPosition($this->GetIDForIdent("StatusWarning"), 140);
-
         $this->RegisterVariableInteger('WifiStrength', 'WLAN Signalstärke', 'Rika.Signal');
-        IPS_SetPosition($this->GetIDForIdent("WifiStrength"), 150);
-
         $this->RegisterVariableString('SoftwareMain', 'Software Hauptplatine', '');
-        IPS_SetPosition($this->GetIDForIdent("SoftwareMain"), 160);
-
         $this->RegisterVariableString('SoftwareDisplay', 'Software Display', '');
-        IPS_SetPosition($this->GetIDForIdent("SoftwareDisplay"), 170);
 
 
         // Timer aktivieren anhand des konfigurierten Intervalls
@@ -181,4 +155,192 @@ class RikaStove extends IPSModule {
     public function RequestAction($Ident, $Value) {
         switch ($Ident) {
             case "Status":
-                $this->SetStoveControl(
+                $this->SetStoveControl(['onOff' => (bool)$Value]);
+                break;
+            case "OperatingMode":
+                $this->SetStoveControl(['operatingMode' => (int)$Value]);
+                break;
+            case "TargetTemperature":
+                $this->SetStoveControl(['targetTemperature' => (string)$Value]);
+                break;
+            case 'ConvectionFan1Level':
+                $this->SetStoveControl(['convectionFan1Level' => (int)$Value]);
+                break;
+            case 'ConvectionFan2Level':
+                $this->SetStoveControl(['convectionFan2Level' => (int)$Value]);
+                break;
+            default:
+                throw new Exception("Invalid Ident");
+        }
+    }
+
+    // Öffentliche Funktion, um den Status manuell oder per Timer zu triggern
+    public function UpdateStatus() {
+        $stoveId = $this->ReadPropertyString("StoveID");
+        if (empty($stoveId)) return;
+
+        $statusUrl = $this->baseUrl . "/api/client/" . $stoveId . "/status";
+        $request = $this->firenetRequest($statusUrl);
+
+        // Bei 401 oder wenn wir die Login-Seite sehen -> neu einloggen
+        if ($request['code'] == 401 || strpos($request['body'], 'login') !== false || empty($request['body'])) {
+            if ($this->firenetLogin()) {
+                $request = $this->firenetRequest($statusUrl);
+            } else {
+                $this->SetStatus(201); // Instanz-Fehler: Login fehlgeschlagen
+                return;
+            }
+        }
+
+        if ($request['code'] == 200) {
+            $data = json_decode($request['body'], true);
+            $this->SetStatus(102); // Instanz ist aktiv
+
+            // Automatisches Benennen der Instanz nach dem Ofenmodell (nur bei Erstinstallation)
+            if (isset($data['name']) && !empty($data['name'])) {
+                $currentName = IPS_GetName($this->InstanceID);
+                $modelName = trim($data['name']);
+                
+                // NUR umbenennen, wenn die Instanz exakt noch den Standardnamen trägt
+                if ($currentName === "RikaStove") {
+                    IPS_SetName($this->InstanceID, "RikaStove " . $modelName);
+                }
+            }
+
+            // 1. Zuweisung: Steuerungswerte (Controls)
+            if (isset($data['controls'])) {
+                $this->SetValue("Status", (bool)$data['controls']['onOff']);
+                $this->SetValue('OperatingMode', intval($data['controls']['operatingMode']));
+                $this->SetValue("TargetTemperature", floatval($data['controls']['targetTemperature']));
+                $this->SetValue('ConvectionFan1Level', intval($data['controls']['convectionFan1Level']));
+                $this->SetValue('ConvectionFan2Level', intval($data['controls']['convectionFan2Level']));
+            }
+
+            // 2. Zuweisung: Sensor- & Diagnosedaten (Sensors)
+            if (isset($data['sensors'])) {
+                $this->SetValue("RoomTemperature", floatval($data['sensors']['inputRoomTemperature']));
+                $this->SetValue("FlameTemperature", floatval($data['sensors']['inputFlameTemperature']));
+                $this->SetValue("StoveState", intval($data['sensors']['statusMainState']));
+                
+                $this->SetValue('StatusError', intval($data['sensors']['statusError']));
+                $this->SetValue('StatusWarning', intval($data['sensors']['statusWarning']));
+                $this->SetValue('WifiStrength', intval($data['sensors']['statusWifiStrength']));
+
+                $runtime = 0.0;
+                $feedRate = 0.0;
+
+                if (isset($data['sensors']['parameterRuntimePellets'])) {
+                    $runtime = floatval($data['sensors']['parameterRuntimePellets']);
+                    $this->SetValue('ParameterRuntimePellets', $runtime);
+                }
+                if (isset($data['sensors']['parameterFeedRateTotal'])) {
+                    $feedRate = floatval($data['sensors']['parameterFeedRateTotal']);
+                    $this->SetValue('ParameterFeedRateTotal', $feedRate);
+                }
+                if (isset($data['sensors']['parameterIgnitionCount'])) {
+                    $this->SetValue('ParameterIgnitionCount', intval($data['sensors']['parameterIgnitionCount']));
+                }
+
+                // HIER DIE NEUE OPTIMIERUNG: Berechnung des Durchschnitt-Verbrauchs
+                if ($runtime > 0 && $feedRate > 0) {
+                    $avgConsumption = $feedRate / $runtime;
+                    $this->SetValue('AverageConsumptionPerHour', $avgConsumption);
+                } else {
+                    $this->SetValue('AverageConsumptionPerHour', 0.0);
+                }
+
+                if (isset($data['sensors']['parameterVersionMainBoard'])) {
+                    $this->SetValue('SoftwareMain', strval($data['sensors']['parameterVersionMainBoard']));
+                }
+                if (isset($data['sensors']['parameterVersionTFT'])) {
+                    $this->SetValue('SoftwareDisplay', strval($data['sensors']['parameterVersionTFT']));
+                }
+            }
+        } else {
+            $this->SetStatus(202); // Instanz-Fehler: Datenabruf fehlgeschlagen
+        }
+    }
+
+    // Interne Funktion zum Senden von Steuerbefehlen
+    private function SetStoveControl($newData) {
+        $stoveId = $this->ReadPropertyString("StoveID");
+        $statusUrl = $this->baseUrl . "/api/client/" . $stoveId . "/status";
+        
+        // Erst aktuellen Zustand holen, um das vollständige Objekt zu manipulieren
+        $request = $this->firenetRequest($statusUrl);
+        if ($request['code'] == 200) {
+            $data = json_decode($request['body'], true);
+            $controlsPayload = $data['controls'];
+
+            // Neue Werte einmischen (z.B. onOff oder targetTemperature)
+            foreach ($newData as $key => $val) {
+                $controlsPayload[$key] = $val;
+            }
+
+            $controlUrl = $this->baseUrl . "/api/client/" . $stoveId . "/controls";
+            $send = $this->firenetRequest($controlUrl, json_encode($controlsPayload));
+
+            if ($send['code'] == 200) {
+                // Kurz warten, damit der Rika-Server den Zustand verarbeitet, dann Werte neu einlesen
+                IPS_Sleep(1000);
+                $this->UpdateStatus();
+            }
+        }
+    }
+
+    // Basis cURL Request-Handler
+    private function firenetRequest($url, $postFields = null) {
+        $cookieFile = sys_get_temp_dir() . '/rika_cookie_' . $this->InstanceID . '.txt';
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_COOKIEJAR, $cookieFile);
+        curl_setopt($ch, CURLOPT_COOKIEFILE, $cookieFile);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_AUTOREFERER, true);
+
+        if ($postFields !== null) {
+            curl_setopt($ch, CURLOPT_POST, true);
+            if (is_array($postFields)) {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, http_build_query($postFields));
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/x-www-form-urlencoded'));
+            } else {
+                curl_setopt($ch, CURLOPT_POSTFIELDS, $postFields);
+                curl_setopt($ch, CURLOPT_HTTPHEADER, array('Content-Type: application/json'));
+            }
+        }
+
+        $response = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
+
+        return ['code' => $httpCode, 'body' => $response];
+    }
+
+    // Login-Prozess
+    private function firenetLogin() {
+        $loginPageUrl = $this->baseUrl . "/web/login";
+        
+        // Initiale Session holen
+        $initialRequest = $this->firenetRequest($loginPageUrl);
+        if ($initialRequest['code'] != 200) return false;
+
+        $postUrl = $loginPageUrl;
+        if (preg_match('/action="([^"]+)"/', $initialRequest['body'], $actionMatches)) {
+            $extractedAction = $actionMatches[1];
+            $postUrl = (strpos($extractedAction, 'http') !== 0) ? $this->baseUrl . $extractedAction : $extractedAction;
+        }
+
+        $payload = [
+            'email'    => $this->ReadPropertyString("Email"),
+            'password' => $this->ReadPropertyString("Password")
+        ];
+
+        $result = $this->firenetRequest($postUrl, $payload);
+        
+        // cURL folgt dem Redirect. Wenn wir eingeloggt sind, sind wir nicht mehr auf /login
+        return (strpos($result['body'], 'logout') !== false || strpos($result['body'], '/web/logout') !== false);
+    }
+}

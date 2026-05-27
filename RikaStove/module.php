@@ -20,7 +20,11 @@ class RikaStove extends IPSModule
     {
         parent::ApplyChanges();
 
-        // 1. Profil für den Ofen-Zustand (Integer - Nur Lesen)
+        // ----------------------------------------------------
+        // VARIABLENPROFILE ERSTELLEN
+        // ----------------------------------------------------
+
+        // Ofen-Betriebszustand (Ist-Zustand)
         if (!IPS_VariableProfileExists('Rika.Status')) {
             IPS_CreateVariableProfile('Rika.Status', 1);
             IPS_SetVariableProfileAssociation('Rika.Status', 1, "Aus / Standby", "", -1);
@@ -30,7 +34,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileAssociation('Rika.Status', 5, "Ausbrand", "", -1);
         }
 
-        // 2. Profil für die Betriebsmodi (Exakt nach deinen Werten: 0, 1, 2)
+        // Betriebsmodus (Soll-Modus)
         if (!IPS_VariableProfileExists('Rika.OperatingMode')) {
             IPS_CreateVariableProfile('Rika.OperatingMode', 1);
             IPS_SetVariableProfileValues('Rika.OperatingMode', 0, 2, 1);
@@ -40,7 +44,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.OperatingMode', "Gear");
         }
 
-        // 3. Profil für die Soll-Temperatur (Float, 14-28°C, Schrittweite 1)
+        // Soll-Temperatur
         if (!IPS_VariableProfileExists('Rika.TargetTemp')) {
             IPS_CreateVariableProfile('Rika.TargetTemp', 2); 
             IPS_SetVariableProfileValues('Rika.TargetTemp', 14.0, 28.0, 1.0);
@@ -49,14 +53,14 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.TargetTemp', "Temperature");
         }
 
-        // 4. Profil für Gebläsestufen (Integer, 0-5)
+        // MultiAir Gebläsestufen
         if (!IPS_VariableProfileExists('Rika.FanLevel')) {
             IPS_CreateVariableProfile('Rika.FanLevel', 1);
             IPS_SetVariableProfileValues('Rika.FanLevel', 0, 5, 1);
             IPS_SetVariableProfileIcon('Rika.FanLevel', "Ventilator");
         }
 
-        // 5. Profil für Laufzeiten (Float / Stunden)
+        // Laufzeiten in Stunden
         if (!IPS_VariableProfileExists('Rika.Hours')) {
             IPS_CreateVariableProfile('Rika.Hours', 2);
             IPS_SetVariableProfileDigits('Rika.Hours', 1);
@@ -64,7 +68,7 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.Hours', "Clock");
         }
 
-        // 6. Profil für Pelletsverbrauch (Float / Kilogramm)
+        // Pelletsverbrauch in Kilogramm
         if (!IPS_VariableProfileExists('Rika.Kg')) {
             IPS_CreateVariableProfile('Rika.Kg', 2);
             IPS_SetVariableProfileDigits('Rika.Kg', 1);
@@ -72,65 +76,75 @@ class RikaStove extends IPSModule
             IPS_SetVariableProfileIcon('Rika.Kg', "Box");
         }
 
-        // 7. Profil für WLAN Signalstärke (Integer / dBm)
+        // NEU: Durchschnittlicher Verbrauch pro Stunde (kg/h)
+        if (!IPS_VariableProfileExists('Rika.KgPerHour')) {
+            IPS_CreateVariableProfile('Rika.KgPerHour', 2);
+            IPS_SetVariableProfileDigits('Rika.KgPerHour', 2);
+            IPS_SetVariableProfileText('Rika.KgPerHour', "", " kg/h");
+            IPS_SetVariableProfileIcon('Rika.KgPerHour', "Graph");
+        }
+
+        // WLAN Signalstärke
         if (!IPS_VariableProfileExists('Rika.Signal')) {
             IPS_CreateVariableProfile('Rika.Signal', 1);
             IPS_SetVariableProfileText('Rika.Signal', "", " dBm");
             IPS_SetVariableProfileIcon('Rika.Signal', "Signal");
         }
 
-        // 8. NEU: Profil für die Fehlercodes (Mapping von IDs auf kurze Wörter)
+        // Fehlercodes
         if (!IPS_VariableProfileExists('Rika.Error')) {
             IPS_CreateVariableProfile('Rika.Error', 1);
-            IPS_SetVariableProfileAssociation('Rika.Error', 0, "OK", "", 0x00FF00); // Grün bei 0
-            IPS_SetVariableProfileAssociation('Rika.Error', 1, "Keine Pellets", "", 0xFF0000); // Rot bei Fehlern
+            IPS_SetVariableProfileAssociation('Rika.Error', 0, "OK", "", 0x00FF00);
+            IPS_SetVariableProfileAssociation('Rika.Error', 1, "Keine Pellets", "", 0xFF0000);
             IPS_SetVariableProfileAssociation('Rika.Error', 2, "Zündung fehlgeschlagen", "", 0xFF0000);
             IPS_SetVariableProfileAssociation('Rika.Error', 3, "Brennkammer offen / Tür", "", 0xFF0000);
             IPS_SetVariableProfileAssociation('Rika.Error', 4, "Sicherheitsschalter", "", 0xFF0000);
             IPS_SetVariableProfileAssociation('Rika.Error', 5, "Übertemperatur", "", 0xFF0000);
-            IPS_SetVariableProfileAssociation('Rika.Error', 99, "Unbekannter Fehler", "", 0xFF0000);
             IPS_SetVariableProfileIcon('Rika.Error', "Alert");
         }
 
-        // --- Variablen registrieren ---
 
-        // Basiseinstellungen & Temperaturen
+        // ----------------------------------------------------
+        // VARIABLEN REGISTRIEREN (OPTIMALE LOGISCHE REIHENFOLGE)
+        // ----------------------------------------------------
+
+        // BLOCK 1: Aktive Ofensteuerung (Die wichtigsten Bedienelemente ganz oben)
         $this->RegisterVariableBoolean('Status', 'Ofen An/Aus', '~Switch');
         $this->EnableAction('Status');
 
-        // Betriebsmodus
         $this->RegisterVariableInteger('OperatingMode', 'Betriebsmodus', 'Rika.OperatingMode');
         $this->EnableAction('OperatingMode');
 
-        $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
-        $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
-        
         $this->RegisterVariableFloat('TargetTemperature', 'Soll-Temperatur', 'Rika.TargetTemp');
         $this->EnableAction('TargetTemperature');
 
+        // BLOCK 2: Aktuelle Status- & Temperaturwerte (Direktes Feedback)
         $this->RegisterVariableInteger('StoveState', 'Ofen Zustand', 'Rika.Status');
+        $this->RegisterVariableFloat('RoomTemperature', 'Raumtemperatur', '~Temperature');
+        $this->RegisterVariableFloat('FlameTemperature', 'Flammentemperatur', '~Temperature');
 
-        // MultiAir Gebläse
+        // BLOCK 3: MultiAir Erweiterungen (Lüftersteuerung)
         $this->RegisterVariableInteger('ConvectionFan1Level', 'MultiAir 1 Stufe', 'Rika.FanLevel');
         $this->EnableAction('ConvectionFan1Level');
+
         $this->RegisterVariableInteger('ConvectionFan2Level', 'MultiAir 2 Stufe', 'Rika.FanLevel');
         $this->EnableAction('ConvectionFan2Level');
 
-        // Diagnosedaten & Zähler
+        // BLOCK 4: Energieverbrauch & Zähler (Statistik & Verbrauch)
+        $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch Gesamt', 'Rika.Kg');
         $this->RegisterVariableFloat('ParameterRuntimePellets', 'Laufzeit Pellets', 'Rika.Hours');
-        $this->RegisterVariableFloat('ParameterFeedRateTotal', 'Pelletsverbrauch', 'Rika.Kg');
+        $this->RegisterVariableFloat('AverageConsumptionPerHour', 'Verbrauch pro Stunde Ø', 'Rika.KgPerHour'); // NEU
         $this->RegisterVariableInteger('ParameterIgnitionCount', 'Anzahl Zündungen', '');
-        $this->RegisterVariableInteger('WifiStrength', 'WLAN Signalstärke', 'Rika.Signal');
-        
-        // Fehler / Warnungen (Hier nutzen wir jetzt das neue Mapping-Profil!)
+
+        // BLOCK 5: Systemdiagnose & Wartung (Hintergrund- & Fehlerdaten ganz unten)
         $this->RegisterVariableInteger('StatusError', 'Fehlerzustand', 'Rika.Error');
         $this->RegisterVariableInteger('StatusWarning', 'Warnungscode', '');
-
-        // Software-Versionen
+        $this->RegisterVariableInteger('WifiStrength', 'WLAN Signalstärke', 'Rika.Signal');
         $this->RegisterVariableString('SoftwareMain', 'Software Hauptplatine', '');
         $this->RegisterVariableString('SoftwareDisplay', 'Software Display', '');
 
-        // Timer setzen
+
+        // Timer-Intervall setzen
         $this->SetTimerInterval('UpdateData', $this->ReadPropertyInteger('Interval') * 1000);
     }
 
@@ -178,7 +192,7 @@ class RikaStove extends IPSModule
             $data = json_decode($request['body'], true);
             $this->SetStatus(102);
 
-            // 1. Daten aus dem 'controls' Array
+            // 1. Zuweisung: Steuerungswerte (Controls)
             if (isset($data['controls'])) {
                 $this->SetValue('Status', (bool)$data['controls']['onOff']);
                 $this->SetValue('OperatingMode', intval($data['controls']['operatingMode']));
@@ -187,7 +201,7 @@ class RikaStove extends IPSModule
                 $this->SetValue('ConvectionFan2Level', intval($data['controls']['convectionFan2Level']));
             }
 
-            // 2. Daten aus dem 'sensors' Array
+            // 2. Zuweisung: Sensor- & Diagnosedaten (Sensors)
             if (isset($data['sensors'])) {
                 $this->SetValue('RoomTemperature', floatval($data['sensors']['inputRoomTemperature']));
                 $this->SetValue('FlameTemperature', floatval($data['sensors']['inputFlameTemperature']));
@@ -197,17 +211,29 @@ class RikaStove extends IPSModule
                 $this->SetValue('StatusWarning', intval($data['sensors']['statusWarning']));
                 $this->SetValue('WifiStrength', intval($data['sensors']['statusWifiStrength']));
 
+                $runtime = 0.0;
+                $feedRate = 0.0;
+
                 if (isset($data['sensors']['parameterRuntimePellets'])) {
-                    $this->SetValue('ParameterRuntimePellets', floatval($data['sensors']['parameterRuntimePellets']));
+                    $runtime = floatval($data['sensors']['parameterRuntimePellets']);
+                    $this->SetValue('ParameterRuntimePellets', $runtime);
                 }
                 if (isset($data['sensors']['parameterFeedRateTotal'])) {
-                    $this->SetValue('ParameterFeedRateTotal', floatval($data['sensors']['parameterFeedRateTotal']));
+                    $feedRate = floatval($data['sensors']['parameterFeedRateTotal']);
+                    $this->SetValue('ParameterFeedRateTotal', $feedRate);
                 }
                 if (isset($data['sensors']['parameterIgnitionCount'])) {
                     $this->SetValue('ParameterIgnitionCount', intval($data['sensors']['parameterIgnitionCount']));
                 }
 
-                // Software-Versionen
+                // NEU: Berechnung des durchschnittlichen Verbrauchs pro Stunde (kg/h)
+                if ($runtime > 0 && $feedRate > 0) {
+                    $avgConsumption = $feedRate / $runtime;
+                    $this->SetValue('AverageConsumptionPerHour', $avgConsumption);
+                } else {
+                    $this->SetValue('AverageConsumptionPerHour', 0.0);
+                }
+
                 if (isset($data['sensors']['parameterVersionMainBoard'])) {
                     $this->SetValue('SoftwareMain', strval($data['sensors']['parameterVersionMainBoard']));
                 }
